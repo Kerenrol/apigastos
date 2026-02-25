@@ -1,0 +1,10 @@
+# Ignore environment file and database schema
+.env
+schema.sql
+
+# Go build artifacts
+/bin/
+/pkg/
+
+# VS Code settings
+.vscode/
