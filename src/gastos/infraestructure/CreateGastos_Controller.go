@@ -2,6 +2,7 @@ package infraestructure
 
 import (
 	"apiGastos/src/gastos/application"
+	"apiGastos/src/gastos/domain"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,10 +10,11 @@ import (
 
 type CreateGastoController struct {
 	useCase *application.CreateGasto
+	repo    domain.IGastos
 }
 
-func NewCreateGastoController(useCase *application.CreateGasto) *CreateGastoController {
-	return &CreateGastoController{useCase: useCase}
+func NewCreateGastoController(useCase *application.CreateGasto, repo domain.IGastos) *CreateGastoController {
+	return &CreateGastoController{useCase: useCase, repo: repo}
 }
 
 type RequestBody struct {
@@ -34,6 +36,14 @@ func (ctrl *CreateGastoController) Execute(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al registrar el gasto", "detalles": err.Error()})
 		return
 	}
+
+	// Emitir evento a través de WebSocket
+	GetHub().BroadcastEvent("create", body.GrupoID, gin.H{
+		"descripcion": body.Descripcion,
+		"monto":       body.Monto,
+		"pagador_id":  body.PagadorID,
+		"grupo_id":    body.GrupoID,
+	})
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Gasto registrado correctamente"})
 }
