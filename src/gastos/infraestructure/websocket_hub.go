@@ -71,16 +71,13 @@ func (h *Hub) run() {
 		case message := <-h.broadcast:
 			h.mu.RLock()
 			for client := range h.clients {
-				// Solo enviar a clientes suscritos al grupo
-				if client.grupoID == message.GrupoID || client.grupoID == 0 {
-					select {
-					case client.send <- message:
-					default:
-						// Si el canal está lleno, cierra la conexión
-						go func(c *Client) {
-							h.unregister <- c
-						}(client)
-					}
+				select {
+				case client.send <- message:
+				default:
+					// Si el canal está lleno, cierra la conexión
+					go func(c *Client) {
+						h.unregister <- c
+					}(client)
 				}
 			}
 			h.mu.RUnlock()
@@ -95,28 +92,30 @@ func (c *Client) readPump() {
 		c.conn.Close()
 	}()
 
-	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	c.conn.SetReadDeadline(time.Now().Add(1440 * time.Second))
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		c.conn.SetReadDeadline(time.Now().Add(1440 * time.Second))
 		return nil
 	})
 
 	for {
-		var msg WebSocketMessage
-		err := c.conn.ReadJSON(&msg)
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("Error WebSocket: %v", err)
-			}
-			break
-		}
-
-		// Procesar mensaje (ej: suscripción a un grupo)
-		if msg.Type == "subscribe" {
-			c.grupoID = msg.GrupoID
-			log.Printf("Cliente suscrito al grupo: %d", msg.GrupoID)
-		}
+	var msg WebSocketMessage
+	err := c.conn.ReadJSON(&msg)
+	if err != nil {
+		break
 	}
+
+	switch msg.Type {
+
+	case "subscribe":
+		c.grupoID = msg.GrupoID
+		log.Printf("Cliente suscrito al grupo: %d", msg.GrupoID)
+
+	case "create", "update", "delete":
+		// enviar a todos los conectados
+		c.hub.broadcast <- msg
+	}
+}
 }
 
 // writePump escribe mensajes al cliente
