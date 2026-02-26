@@ -99,23 +99,23 @@ func (c *Client) readPump() {
 	})
 
 	for {
-	var msg WebSocketMessage
-	err := c.conn.ReadJSON(&msg)
-	if err != nil {
-		break
+		var msg WebSocketMessage
+		err := c.conn.ReadJSON(&msg)
+		if err != nil {
+			break
+		}
+
+		switch msg.Type {
+
+		case "subscribe":
+			c.grupoID = msg.GrupoID
+			log.Printf("Cliente suscrito al grupo: %d", msg.GrupoID)
+
+		case "create", "update", "delete":
+			// enviar a todos los conectados
+			c.hub.broadcast <- msg
+		}
 	}
-
-	switch msg.Type {
-
-	case "subscribe":
-		c.grupoID = msg.GrupoID
-		log.Printf("Cliente suscrito al grupo: %d", msg.GrupoID)
-
-	case "create", "update", "delete":
-		// enviar a todos los conectados
-		c.hub.broadcast <- msg
-	}
-}
 }
 
 // writePump escribe mensajes al cliente
