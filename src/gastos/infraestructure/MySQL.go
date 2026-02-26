@@ -22,13 +22,17 @@ func NewMySQL() domain.IGastos {
 	return &MySQL{conn: conn}
 }
 
-func (mysql *MySQL) CreateGasto(gasto *domain.Gasto) error {
+func (mysql *MySQL) CreateGasto(gasto *domain.Gasto) (int32, error) {
 	query := "INSERT INTO gastos (descripcion, monto, pagador_id, grupo_id, fecha) VALUES (?, ?, ?, ?, NOW())"
-	_, err := mysql.conn.ExecutePreparedQuery(query, gasto.Descripcion, gasto.Monto, gasto.PagadorID, gasto.GrupoID)
+	result, err := mysql.conn.ExecutePreparedQuery(query, gasto.Descripcion, gasto.Monto, gasto.PagadorID, gasto.GrupoID)
 	if err != nil {
-		return fmt.Errorf("error al insertar gasto: %v", err)
+		return 0, fmt.Errorf("error al insertar gasto: %v", err)
 	}
-	return nil
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("error al obtener el id insertado: %v", err)
+	}
+	return int32(id), nil
 }
 
 func (mysql *MySQL) GetGastoById(id int32) (*domain.Gasto, error) {
@@ -82,7 +86,7 @@ func (mysql *MySQL) GetSaldos(grupoId int32) (map[int32]float64, error) {
 		FROM gastos 
 		WHERE grupo_id = ?
 		GROUP BY pagador_id`
-	
+
 	rows, err := mysql.conn.FetchRows(query, grupoId, grupoId)
 	if err != nil {
 		return nil, err
